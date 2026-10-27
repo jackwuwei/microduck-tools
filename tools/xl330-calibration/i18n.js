@@ -141,7 +141,7 @@
   "高精度模型文件不完整": "Incomplete high-resolution model file",
   "高精度模型浮点数据未对齐": "Misaligned model floating-point data",
   "高精度模型索引数据未对齐": "Misaligned model index data",
-  "高精度模型格式与当前观察台不匹配": "Model format does not match this viewer",
+  "高精度模型格式与当前工作台不匹配": "Model format does not match this workbench",
   "高精度模型数量字段异常": "Invalid model counts",
   "高精度模型网格尺寸异常": "Invalid model mesh size",
   "高精度模型索引越界": "Model index out of range",

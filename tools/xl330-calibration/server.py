@@ -11,7 +11,6 @@ from ssh_bus import SshBus
 
 FOLDER = Path(__file__).resolve().parent
 ROOT = FOLDER.parents[1]
-RENDERER = ROOT/'tools/microduck-observer/duck-view.js'
 MODEL = ROOT/'assets/models/duck-web-mouth-v2.bin'
 
 
@@ -20,7 +19,7 @@ def handler(session, port):
     files = {'/':(FOLDER/'index.html','text/html; charset=utf-8'),
              '/app.js':(FOLDER/'app.js','text/javascript; charset=utf-8'),
              '/i18n.js':(FOLDER/'i18n.js','text/javascript; charset=utf-8'),
-             '/duck-view.js':(RENDERER,'text/javascript; charset=utf-8'),
+             '/duck-view.js':(FOLDER/'duck-view.js','text/javascript; charset=utf-8'),
              '/duck.bin':(MODEL,'application/octet-stream')}
     hosts = {f'127.0.0.1:{port}',f'localhost:{port}'}
     class Handler(BaseHTTPRequestHandler):

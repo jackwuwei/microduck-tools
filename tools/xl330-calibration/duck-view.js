@@ -3,7 +3,7 @@
 
   // GPU renderer for Pollen's full-resolution public simulation geometry. The
   // generated asset keeps the MJCF kinematic tree and the original STL triangles;
-  // only hidden electronics are omitted. Rendering and pose calculation stay on Mac.
+  // only hidden electronics are omitted. Rendering and pose calculation stay on the computer.
   const FORMAT_VERSION = 2;
   const DEFAULT_AZIMUTH = -0.7;
   const DEFAULT_ELEVATION = 0.32;
@@ -81,17 +81,6 @@
     };
   }
 
-  function attitudePose(gravityValue) {
-    const gravity = normalized(gravityValue.map(Number));
-    if (dot(gravity, gravity) < 0.5) return identityPose();
-    const down = [0, 0, -1];
-    const axis = cross(gravity, down);
-    const sine = Math.sqrt(dot(axis, axis));
-    const cosine = dot(gravity, down);
-    if (sine < 1e-6) return cosine > 0 ? identityPose() : axisPose([1, 0, 0], Math.PI);
-    return axisPose(axis.map((value) => value / sine), Math.atan2(sine, cosine));
-  }
-
   function matrixFromPose(pose) {
     // WebGL matrices are column-major.
     return new Float32Array([
@@ -155,7 +144,7 @@
     const magic = String.fromCharCode(...reader.bytes(4));
     const version = reader.u32();
     if (magic !== "DHD2" || version !== FORMAT_VERSION) {
-      throw new Error("高精度模型格式与当前观察台不匹配");
+      throw new Error("高精度模型格式与当前工作台不匹配");
     }
     const meshCount = reader.u16();
     const bodyCount = reader.u16();
@@ -205,8 +194,7 @@
     const valid = bodies.every((body, index) => body.parent < index && body.joint < 15)
       && parts.every((part) => part.body < bodies.length && part.mesh < meshes.length);
     if (!valid || reader.at !== reader.view.byteLength) throw new Error("高精度模型结构校验失败");
-    const drawnTriangles = parts.reduce((total, part) => total + meshes[part.mesh].triangleCount, 0);
-    return { meshes, bodies, parts, drawnTriangles };
+    return { meshes, bodies, parts };
   }
 
   function compileShader(gl, type, source) {
@@ -281,7 +269,7 @@
   }
 
   class MicroduckPoseView {
-    constructor(canvas, { maxFps = 25, lightBackground = false } = {}) {
+    constructor(canvas, { maxFps = 25 } = {}) {
       this.canvas = canvas;
       this.gl = canvas.getContext("webgl2", {
         alpha: true,
@@ -293,15 +281,11 @@
       this.model = null;
       this.selectedPart = -1;
       this.joints = DEFAULT_JOINTS.slice();
-      this.gravity = [0, 0, -1];
-      this.live = false;
-      this.hasSample = false;
       this.azimuth = DEFAULT_AZIMUTH;
       this.elevation = DEFAULT_ELEVATION;
       this.pendingFrame = 0;
       this.lastDrawAt = 0;
       this.frameInterval = 1000 / Math.min(60, Math.max(1, maxFps));
-      this.lightBackground = lightBackground;
       this.pendingTimer = null;
       this.drag = null;
       this.error = this.gl ? null : new Error("当前浏览器未提供 WebGL 2，无法显示高精度模型");
@@ -363,17 +347,11 @@
       return this.model;
     }
 
-    setState(joints, gravity) {
+    setState(joints) {
       this.joints = Array.from({ length: 15 }, (_, index) => {
         const value = Number(joints[index]);
         return Number.isFinite(value) ? value : 0;
       });
-      this.gravity = Array.from({ length: 3 }, (_, index) => {
-        const value = Number(gravity[index]);
-        return Number.isFinite(value) ? value : 0;
-      });
-      this.live = true;
-      this.hasSample = true;
       this.invalidate();
     }
 
@@ -384,23 +362,9 @@
       this.invalidate(true);
     }
 
-    setUnavailable() {
-      this.live = false;
-      if (!this.hasSample) {
-        this.joints = DEFAULT_JOINTS.slice();
-        this.gravity = [0, 0, -1];
-      }
-      this.invalidate();
-    }
-
     resetView() {
       this.azimuth = DEFAULT_AZIMUTH;
       this.elevation = DEFAULT_ELEVATION;
-      this.invalidate(true);
-    }
-
-    orbit(delta) {
-      this.azimuth = (this.azimuth + delta) % (Math.PI * 2);
       this.invalidate(true);
     }
 
@@ -474,7 +438,7 @@
 
       const bodyPoses = [];
       this.model.bodies.forEach((body) => {
-        const parent = body.parent < 0 ? attitudePose(this.gravity) : bodyPoses[body.parent];
+        const parent = body.parent < 0 ? identityPose() : bodyPoses[body.parent];
         let pose = thenPose(parent, quaternionPose(body.quaternion, body.position));
         if (body.joint >= 0) pose = thenPose(pose, axisPose(body.axis, this.joints[body.joint] || 0));
         bodyPoses.push(pose);
@@ -518,8 +482,7 @@
 
       gl.uniformMatrix4fv(this.uniforms.uModel, false, matrixFromPose(identityPose()));
       gl.uniform1f(this.uniforms.uFloor, 0);
-      gl.uniform3fv(this.uniforms.uColour, this.lightBackground
-        ? [0.89, 0.91, 0.93] : this.live ? [0.16, 0.22, 0.29] : [0.13, 0.18, 0.24]);
+      gl.uniform3fv(this.uniforms.uColour, [0.89, 0.91, 0.93]);
       gl.uniform1i(this.uniforms.uLineMode, 1);
       gl.bindVertexArray(this.gridVao);
       gl.drawArrays(gl.LINES, 0, this.gridVertexCount);
