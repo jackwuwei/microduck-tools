@@ -1,15 +1,19 @@
 'use strict';
 const $ = id => document.getElementById(id);
 const home = [0,-.0873,-.4579,-.0049,.4530,.3491,.3491,0,0,0,0,.0873,.4579,.0049,-.4530];
+// XL330 housing instances in duck-web-mouth-v2.bin (mesh 3). Motor housings
+// can be attached to either side of a joint; moving-body indices are not motor IDs.
+const servoParts = {20:3,21:8,22:17,23:14,24:19,30:25,31:26,32:31,33:39,34:36,10:4,11:48,12:57,13:53,14:58};
 let view,modelError=null;
 try { view=new window.MicroduckPoseView($('duck'),{maxFps:30,lightBackground:true}); }
-catch(error){modelError=error.message;view={setState(){},load:async()=>{}};}
+catch(error){modelError=error.message;view={setState(){},setSelectedPart(){},load:async()=>{}};}
 let state=null, selected=20, reference='zero', busy=false, lastSeen=0, revision=0;
 const labels={drive:'Drive Mode (10)',offset:'Homing Offset (20)',minimum:'Min Position (52)',maximum:'Max Position (48)'};
 function pose(){
   if(!state)return;
   let joints=Array(15).fill(0);
   const index=state.joints.findIndex(j=>j.id===selected);
+  view.setSelectedPart(servoParts[selected]);
   if(reference==='home')joints=home.slice();
   if(reference==='positive'||reference==='negative')joints[index]=(reference==='positive'?1:-1)*Math.PI/18;
   if(reference==='measured')joints=state.joints.map(j=>j.telemetry?(j.telemetry.position-2048)*Math.PI/2048:0);

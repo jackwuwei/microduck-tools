@@ -250,6 +250,7 @@
       uniform vec3 uColour;
       uniform vec3 uLight;
       uniform bool uLineMode;
+      uniform float uOpacity;
       in vec3 vWorld;
       out vec4 outColour;
       void main() {
@@ -262,7 +263,7 @@
         float diffuse = max(dot(normal, normalize(uLight)), 0.0);
         float hemisphere = 0.5 + 0.5 * normal.z;
         float shade = 0.56 + 0.34 * diffuse + 0.10 * hemisphere;
-        outColour = vec4(uColour * shade, 1.0);
+        outColour = vec4(uColour * shade, uOpacity);
       }
     `);
     const program = gl.createProgram();
@@ -290,6 +291,7 @@
         powerPreference: "high-performance",
       });
       this.model = null;
+      this.selectedPart = -1;
       this.joints = DEFAULT_JOINTS.slice();
       this.gravity = [0, 0, -1];
       this.live = false;
@@ -315,7 +317,7 @@
       this.program = createProgram(gl);
       this.uniforms = Object.fromEntries([
         "uModel", "uRight", "uUp", "uForward", "uViewScale", "uFloor",
-        "uLookAt", "uColour", "uLight", "uLineMode",
+        "uLookAt", "uColour", "uLight", "uLineMode", "uOpacity",
       ].map((name) => [name, gl.getUniformLocation(this.program, name)]));
       const grid = [];
       const lineCount = Math.round(GRID_REACH / GRID_STEP);
@@ -373,6 +375,13 @@
       this.live = true;
       this.hasSample = true;
       this.invalidate();
+    }
+
+    setSelectedPart(index) {
+      const selected = Number.isInteger(index) && index >= 0 ? index : -1;
+      if (selected === this.selectedPart) return;
+      this.selectedPart = selected;
+      this.invalidate(true);
     }
 
     setUnavailable() {
@@ -499,6 +508,7 @@
       const lookAt = dot([0, 0, LOOK_AT_Z], up);
 
       gl.useProgram(this.program);
+      gl.uniform1f(this.uniforms.uOpacity, 1);
       gl.uniform3fv(this.uniforms.uRight, right);
       gl.uniform3fv(this.uniforms.uUp, up);
       gl.uniform3fv(this.uniforms.uForward, forward);
@@ -519,10 +529,30 @@
       this.model.parts.forEach((part, index) => {
         const mesh = this.model.meshes[part.mesh];
         gl.uniformMatrix4fv(this.uniforms.uModel, false, matrixFromPose(partPoses[index]));
-        gl.uniform3fv(this.uniforms.uColour, part.colour);
+        const selected = index === this.selectedPart;
+        gl.uniform3fv(this.uniforms.uColour, selected ? [0.12, 0.60, 1.0] : part.colour);
         gl.bindVertexArray(mesh.vao);
         gl.drawElements(gl.TRIANGLES, mesh.indices.length, gl.UNSIGNED_INT, 0);
       });
+      // Draw the selected housing's hidden surfaces over the shell. Keep the
+      // scene depth intact so visible surfaces retain their normal shading.
+      const selectedPart = this.model.parts[this.selectedPart];
+      if (selectedPart) {
+        const mesh = this.model.meshes[selectedPart.mesh];
+        gl.uniformMatrix4fv(this.uniforms.uModel, false, matrixFromPose(partPoses[this.selectedPart]));
+        gl.uniform3fv(this.uniforms.uColour, [0.12, 0.60, 1.0]);
+        gl.uniform1f(this.uniforms.uOpacity, 0.45);
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+        gl.depthFunc(gl.GREATER);
+        gl.depthMask(false);
+        gl.bindVertexArray(mesh.vao);
+        gl.drawElements(gl.TRIANGLES, mesh.indices.length, gl.UNSIGNED_INT, 0);
+        gl.depthMask(true);
+        gl.depthFunc(gl.LEQUAL);
+        gl.disable(gl.BLEND);
+        gl.uniform1f(this.uniforms.uOpacity, 1);
+      }
       gl.bindVertexArray(null);
     }
   }
