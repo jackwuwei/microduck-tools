@@ -38,6 +38,10 @@ Photo backgrounds were blurred with AI assistance to hide unrelated details. The
 
 ## Calibration workbench
 
+![English calibration workbench: joint selection, servo X-ray highlight and calibration panel](assets/screenshots/calibration-en.jpg)
+
+English workbench screenshot (demo mode, 1440 × 1000 desktop browser viewport).
+
 The interaction takes inspiration from kissqy/Microduck-kissqy: individual joint selection, separate zero / positive / negative / HOME references, capture, preview and save. The DYNAMIXEL Protocol 2.0 backend was implemented independently; no source code, calibration data or UI assets were copied from that project. The existing 3D renderer and model are reused; see the [upstream model license statement](https://github.com/pollen-robotics/microduck_rl/blob/d424a0c899f6b33cbd3daeb279913134349c0b63/README.md#license).
 
 Supports this project’s **15 XL330-M288-T servos (model 1200), position mode 3**. The only EEPROM writes are the Drive Mode direction bit, Homing Offset and Min/Max Position Limit. The workbench never sends Goal Position, enables torque, stops services automatically or modifies IMU calibration.
