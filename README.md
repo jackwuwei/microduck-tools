@@ -38,7 +38,7 @@ Microduck 标定工作台与 V3 最终版标定托盘。**工作台始终运行�
 
 ## 标定工作台
 
-参考 kissqy/Microduck-kissqy 的逐关节选择、独立零位 / 正负向 / HOME 参考、采集、预览、保存交互，重新实现 DYNAMIXEL Protocol 2.0 后端。未复制对方源码、标定数据或界面资产。复用既有 3D 渲染器及模型（许可见 [官方模型许可记录](LICENSES/官方模型许可依据/README.md)）。
+参考 kissqy/Microduck-kissqy 的逐关节选择、独立零位 / 正负向 / HOME 参考、采集、预览、保存交互，重新实现 DYNAMIXEL Protocol 2.0 后端。未复制对方源码、标定数据或界面资产。复用既有 3D 渲染器及模型（许可见 [上游模型许可说明](https://github.com/pollen-robotics/microduck_rl/blob/d424a0c899f6b33cbd3daeb279913134349c0b63/README.md#license)）。
 
 支持本项目的 **15 台 XL330-M288-T（型号 1200）及位置模式 3**。仅写入 EEPROM 的 Drive Mode 方向位、Homing Offset 和 Min/Max Position Limit，不发送 Goal Position、不启用扭矩、不自动停止服务。本工具不会改写 IMU 标定。
 
@@ -532,7 +532,7 @@ node --test tools/xl330-calibration/test_i18n.cjs
 
 | 内容 | 来源与适用说明 |
 | --- | --- |
-| 机器人参考几何、界面机器人模型及衍生夹具 | Pollen Robotics [`microduck_rl`](https://github.com/pollen-robotics/microduck_rl/tree/d424a0c899f6b33cbd3daeb279913134349c0b63)，提交 `d424a0c899f6b33cbd3daeb279913134349c0b63`。锁定版 README 标明模型为 CC BY-SA-NC，未写明版本号；不自行追加版本或商业授权。原始许可依据保留在 [LICENSES/官方模型许可依据/](LICENSES/官方模型许可依据/README.md)。软件的 Apache-2.0 条款不覆盖机械模型。 |
+| 机器人参考几何、界面机器人模型及衍生夹具 | Pollen Robotics [`microduck_rl`](https://github.com/pollen-robotics/microduck_rl/tree/d424a0c899f6b33cbd3daeb279913134349c0b63)，提交 `d424a0c899f6b33cbd3daeb279913134349c0b63`。锁定版 README 标明模型为 CC BY-SA-NC，未写明版本号；不自行追加版本或商业授权。原始许可依据见[固定版本的上游 README](https://github.com/pollen-robotics/microduck_rl/blob/d424a0c899f6b33cbd3daeb279913134349c0b63/README.md#license)。软件的 Apache-2.0 条款不覆盖机械模型。 |
 | XL330 标定工作台及共享 3D 渲染器 | 自有软件代码采用 [Apache-2.0](LICENSE)；交互参考和实现说明见 [标定工作台说明](#workbench)。 |
 | 控制程序适配补丁 | 基于 Pollen Robotics [`microduck` 固定提交](https://github.com/pollen-robotics/microduck/tree/942e58e3aa6dbb28e7037203fff11866122c7567)，按 Apache-2.0 提供。补丁默认零补偿，需填写各自实测值。 |
 | 实拍照片 | 用户提供的机器人与标定托盘照片，用于本项目说明；不自动套用代码或机械模型许可。 |

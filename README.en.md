@@ -38,7 +38,7 @@ Photo backgrounds were blurred with AI assistance to hide unrelated details. The
 
 ## Calibration workbench
 
-The interaction takes inspiration from kissqy/Microduck-kissqy: individual joint selection, separate zero / positive / negative / HOME references, capture, preview and save. The DYNAMIXEL Protocol 2.0 backend was implemented independently; no source code, calibration data or UI assets were copied from that project. The existing 3D renderer and model are reused; see the [original model license evidence](LICENSES/官方模型许可依据/README.md).
+The interaction takes inspiration from kissqy/Microduck-kissqy: individual joint selection, separate zero / positive / negative / HOME references, capture, preview and save. The DYNAMIXEL Protocol 2.0 backend was implemented independently; no source code, calibration data or UI assets were copied from that project. The existing 3D renderer and model are reused; see the [upstream model license statement](https://github.com/pollen-robotics/microduck_rl/blob/d424a0c899f6b33cbd3daeb279913134349c0b63/README.md#license).
 
 Supports this project’s **15 XL330-M288-T servos (model 1200), position mode 3**. The only EEPROM writes are the Drive Mode direction bit, Homing Offset and Min/Max Position Limit. The workbench never sends Goal Position, enables torque, stops services automatically or modifies IMU calibration.
 
@@ -503,10 +503,10 @@ Values come directly from CLI G-code headers: `model printing time`, `total esti
 
 | Content | Source and terms |
 | --- | --- |
-| Robot reference geometry, UI robot model and derived fixtures | Pollen Robotics [`microduck_rl`](https://github.com/pollen-robotics/microduck_rl/tree/d424a0c899f6b33cbd3daeb279913134349c0b63), commit `d424a0c899f6b33cbd3daeb279913134349c0b63`. The pinned README says CC BY-SA-NC for model files without a version number; no additional version or commercial permission is implied. Original evidence is retained in [LICENSES/官方模型许可依据/](LICENSES/官方模型许可依据/README.md). Software Apache-2.0 does not cover mechanical models. |
+| Robot reference geometry, UI robot model and derived fixtures | Pollen Robotics [`microduck_rl`](https://github.com/pollen-robotics/microduck_rl/tree/d424a0c899f6b33cbd3daeb279913134349c0b63), commit `d424a0c899f6b33cbd3daeb279913134349c0b63`. The pinned README says CC BY-SA-NC for model files without a version number; no additional version or commercial permission is implied. See the [pinned upstream README](https://github.com/pollen-robotics/microduck_rl/blob/d424a0c899f6b33cbd3daeb279913134349c0b63/README.md#license) for the original license statement. Software Apache-2.0 does not cover mechanical models. |
 | XL330 workbench and shared 3D renderer | Original software under [Apache-2.0](LICENSE); see [workbench implementation and interaction reference](#workbench). |
 | Runtime adaptation patch | Based on the [pinned Pollen Robotics microduck commit](https://github.com/pollen-robotics/microduck/tree/942e58e3aa6dbb28e7037203fff11866122c7567), under Apache-2.0. Trims default to zero; supply your own measurements. |
 | Photos | User-provided robot and tray photos for this project’s documentation; code or model licenses do not automatically apply. |
 | 3D-printed calibration fixture | The V3 zero tray references Xingmao’s XGO Duck neutral-position tray (`R7_X2D04_PETG_slice_reference.gcode.3mf`, CC BY-NC-SA 4.0), borrowing only the supine positioning approach. This design and derived geometry retain attribution and noncommercial terms under CC BY-NC-SA 4.0, without expanding upstream permissions. See [printing instructions](#cad-printing). |
 
-This is an unofficial personal research reproduction, not an official Pollen Robotics release. The retained upstream license-evidence README is already in English and is preserved verbatim.
+This is an unofficial personal research reproduction, not an official Pollen Robotics release.
