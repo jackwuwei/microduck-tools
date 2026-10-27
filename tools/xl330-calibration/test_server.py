@@ -1,10 +1,14 @@
 import http.client
+import itertools
 import json
 import tempfile
 import threading
 import unittest
 from http.server import ThreadingHTTPServer
+from pathlib import Path
+from unittest import mock
 from calibration import Session,DemoBus
+import server
 from server import handler
 
 class HttpTests(unittest.TestCase):
@@ -38,14 +42,33 @@ class HttpTests(unittest.TestCase):
         token=json.loads(data)['preview']['token']
         self.assertEqual(self.request('/api/apply',dict(motor=20,token=token))[0],200)
         self.assertEqual(self.session.bus.rows[20]['offset'],-52)
-        self.assertEqual(self.request('/api/apply',dict(motor=20,token=token))[0],409)
-        self.assertIsNone(self.session.bus)
-    def test_bad_id_and_hardware_fault_disconnect(self):
+        status,data=self.request('/api/apply',dict(motor=20,token=token))
+        self.assertEqual(status,409);self.assertFalse(json.loads(data)['disconnected'])
+        self.assertIsNotNone(self.session.bus)
+    def test_rejected_request_keeps_session_and_captures(self):
         self.request('/api/connect',{})
-        self.assertEqual(self.request('/api/capture',dict(motor=254,kind='zero'))[0],409)
+        backup=self.session.backup
+        self.request('/api/capture',dict(motor=20,kind='zero'))
+        for body in [dict(motor=254,kind='zero'),dict(motor=20,kind='bogus')]:
+            status,data=self.request('/api/capture',body)
+            self.assertEqual(status,409);self.assertFalse(json.loads(data)['disconnected'])
+        self.session.bus.rows[21]['position']=2048
+        reads=itertools.cycle([2048,2100])
+        with mock.patch.object(self.session.bus,'read',side_effect=lambda m,n:next(reads) if n=='position' and m==21 else self.session.bus.rows[m][n]):
+            self.assertEqual(self.request('/api/capture',dict(motor=21,kind='zero'))[0],409)
+        self.assertEqual(self.request('/api/connect',{})[0],409)
+        self.assertIsNotNone(self.session.bus)
+        self.assertEqual(self.session.backup,backup)
+        self.assertEqual(self.session.marks,{20:{'zero':2048}})
+    def test_hardware_fault_disconnects(self):
         self.request('/api/connect',{})
         self.session.bus.rows[20]['torque']=1
         self.assertEqual(self.request('/api/state')[0],409)
         self.assertIsNone(self.session.bus)
+
+class AssetTests(unittest.TestCase):
+    def test_missing_asset_fails_at_startup(self):
+        with mock.patch.object(server,'MODEL',Path('/nonexistent/duck.bin')):
+            with self.assertRaisesRegex(FileNotFoundError,'duck.bin'):handler(Session(DemoBus,'.',True),0)
 
 if __name__=='__main__':unittest.main()

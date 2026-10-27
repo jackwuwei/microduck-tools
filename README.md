@@ -4,7 +4,7 @@
 
 Microduck 标定工作台与 V3 最终版标定托盘。**工作台始终运行在电脑上，默认通过 SSH 使用 Microduck 的舵机串口，也支持电脑 USB 串口直连。**
 
-工具、模型与打印文件分别位于 `tools/`、`assets/models/` 和 `CAD/`，控制程序适配补丁位于 `patches/`；`work/` 用于本机生成的参数备份与零位采样记录。
+标定工作台（含 3D 渲染器）、模型与打印文件分别位于 `tools/xl330-calibration/`、`assets/models/` 和 `CAD/`，控制程序适配补丁位于 `patches/`；`work/` 用于本机生成的参数备份与零位采样记录。
 
 ## 目录
 
@@ -42,7 +42,7 @@ Microduck 标定工作台与 V3 最终版标定托盘。**工作台始终运行�
 
 中文工作台截图（演示模式，1440 × 1000 桌面浏览器视口）。
 
-参考 kissqy/Microduck-kissqy 的逐关节选择、独立零位 / 正负向 / HOME 参考、采集、预览、保存交互，重新实现 DYNAMIXEL Protocol 2.0 后端。未复制对方源码、标定数据或界面资产。复用既有 3D 渲染器及模型（许可见 [上游模型许可说明](https://github.com/pollen-robotics/microduck_rl/blob/d424a0c899f6b33cbd3daeb279913134349c0b63/README.md#license)）。
+参考 kissqy/Microduck-kissqy 的逐关节选择、独立零位 / 正负向 / HOME 参考、采集、预览、保存交互，重新实现 DYNAMIXEL Protocol 2.0 后端。未复制对方源码、标定数据或界面资产。3D 渲染器 `tools/xl330-calibration/duck-view.js` 仅保留标定预览所需功能，复用既有模型（许可见 [上游模型许可说明](https://github.com/pollen-robotics/microduck_rl/blob/d424a0c899f6b33cbd3daeb279913134349c0b63/README.md#license)）。
 
 支持本项目的 **15 台 XL330-M288-T（型号 1200）及位置模式 3**。仅写入 EEPROM 的 Drive Mode 方向位、Homing Offset 和 Min/Max Position Limit，不发送 Goal Position、不启用扭矩、不自动停止服务。本工具不会改写 IMU 标定。
 
@@ -475,7 +475,7 @@ scripts/dev-push.sh microduck
 
 可恢复所选关节到本次连接前参数，或选择历史备份恢复。备份与模型 ID 无法唯一辨认一只实物舵机，使用者须确认同一机器人和关节。**备份目录要保留。** 发生通信/回读错误后会断开；可能已有部分参数写入，不会报告成功或继续写其他关节。重连后选择故障发生前的备份恢复，不要用重连时新产生的部分状态备份冒充原始参数。参数恢复也逐项回读。断电中途不能保证自动回滚。
 
-服务器仅绑定回环地址，写请求要求同源；单锁串行处理总线操作。串口独占锁和开口静默检测不能阻止物理上另一主控后来接入，因此仍需确认单一总线拥有者。共享 3D 渲染器仅用于模型预览。
+服务器仅绑定回环地址，写请求要求同源；单锁串行处理总线操作。串口独占锁和开口静默检测不能阻止物理上另一主控后来接入，因此仍需确认单一总线拥有者。3D 渲染器仅用于模型预览。
 
 参考：[XL330 官方控制表](https://emanual.robotis.com/docs/en/dxl/x/xl330-m288/)、[交互参考项目](https://github.com/kissqy/Microduck-kissqy)。本项目真机默认使用下述 Microduck 官方 2S 配置。
 
@@ -537,7 +537,7 @@ node --test tools/xl330-calibration/test_i18n.cjs
 | 内容 | 来源与适用说明 |
 | --- | --- |
 | 机器人参考几何、界面机器人模型及衍生夹具 | Pollen Robotics [`microduck_rl`](https://github.com/pollen-robotics/microduck_rl/tree/d424a0c899f6b33cbd3daeb279913134349c0b63)，提交 `d424a0c899f6b33cbd3daeb279913134349c0b63`。锁定版 README 标明模型为 CC BY-SA-NC，未写明版本号；不自行追加版本或商业授权。原始许可依据见[固定版本的上游 README](https://github.com/pollen-robotics/microduck_rl/blob/d424a0c899f6b33cbd3daeb279913134349c0b63/README.md#license)。软件的 Apache-2.0 条款不覆盖机械模型。 |
-| XL330 标定工作台及共享 3D 渲染器 | 自有软件代码采用 [Apache-2.0](LICENSE)；交互参考和实现说明见 [标定工作台说明](#workbench)。 |
+| XL330 标定工作台及 3D 渲染器 | 自有软件代码采用 [Apache-2.0](LICENSE)；交互参考和实现说明见 [标定工作台说明](#workbench)。 |
 | 控制程序适配补丁 | 基于 Pollen Robotics [`microduck` 固定提交](https://github.com/pollen-robotics/microduck/tree/942e58e3aa6dbb28e7037203fff11866122c7567)，按 Apache-2.0 提供。补丁默认零补偿，需填写各自实测值。 |
 | 实拍照片 | 用户提供的机器人与标定托盘照片，用于本项目说明；不自动套用代码或机械模型许可。 |
 | 标定用 3D 打印夹具 | V3 零位托盘参考星猫的 XGO Duck 中位托盘（`R7_X2D04_PETG_slice_reference.gcode.3mf`，CC BY-NC-SA 4.0），仅借鉴仰卧定位方式。本设计和衍生几何按 CC BY-NC-SA 4.0 保留署名和非商业条件，不扩大上游模型授权范围。打印与装配说明见 [打印说明](#cad-printing)。 |

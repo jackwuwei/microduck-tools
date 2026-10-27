@@ -11,11 +11,11 @@
   const WINDOW_METRES = 0.36;
   const GRID_STEP = 0.05;
   const GRID_REACH = 0.30;
-  const DEFAULT_JOINTS = [
+  const HOME_JOINTS = Object.freeze([
     0, -0.0873, -0.4579, -0.0049, 0.4530,
     0.3491, 0.3491, 0, 0, 0,
     0, 0.0873, 0.4579, 0.0049, -0.4530,
-  ];
+  ]);
 
   const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
   const cross = (a, b) => [
@@ -280,7 +280,7 @@
       });
       this.model = null;
       this.selectedPart = -1;
-      this.joints = DEFAULT_JOINTS.slice();
+      this.joints = HOME_JOINTS.slice();
       this.azimuth = DEFAULT_AZIMUTH;
       this.elevation = DEFAULT_ELEVATION;
       this.pendingFrame = 0;
@@ -520,5 +520,6 @@
     }
   }
 
+  MicroduckPoseView.HOME_JOINTS = HOME_JOINTS;
   window.MicroduckPoseView = MicroduckPoseView;
 })();

@@ -1,12 +1,15 @@
 'use strict';
 const i18n = window.MicroduckI18n;
 const $ = id => document.getElementById(id);
-const home = [0,-.0873,-.4579,-.0049,.4530,.3491,.3491,0,0,0,0,.0873,.4579,.0049,-.4530];
+const home = window.MicroduckPoseView?.HOME_JOINTS || Array(15).fill(0);
 // XL330 housing instances in duck-web-mouth-v2.bin (mesh 3). Motor housings
 // can be attached to either side of a joint; moving-body indices are not motor IDs.
 const servoParts = {20:3,21:8,22:17,23:14,24:19,30:25,31:26,32:31,33:39,34:36,10:4,11:48,12:57,13:53,14:58};
 let view,modelError=null;
-try { view=new window.MicroduckPoseView($('duck'),{maxFps:30}); }
+try {
+  if(typeof window.MicroduckPoseView!=='function')throw new Error('3D 渲染器 duck-view.js 未加载；请重启工作台后刷新页面');
+  view=new window.MicroduckPoseView($('duck'),{maxFps:30});
+}
 catch(error){modelError=error.message;view={setState(){},setSelectedPart(){},load:async()=>{}};}
 let state=null, selected=20, reference='zero', busy=false, lastSeen=0, revision=0;
 const labels={drive:'Drive Mode (10)',offset:'Homing Offset (20)',minimum:'Min Position (52)',maximum:'Max Position (48)'};
@@ -75,7 +78,7 @@ function paint(next){
 async function api(path,body){
   const response=await fetch(`/api/${path}`,body===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   const result=await response.json();
-  if(!response.ok)throw new Error(result.error||'请求失败');
+  if(!response.ok)throw Object.assign(new Error(result.error||'请求失败'),{disconnected:result.disconnected!==false});
   return result;
 }
 async function action(path,extra={}){
@@ -90,6 +93,7 @@ async function action(path,extra={}){
     $('backups').replaceChildren(...files.map(file=>{const o=document.createElement('option');o.value=file;o.textContent=file;return o;}));
     if(files.includes(previous))$('backups').value=previous;
   }catch(error){
+    if(!error.disconnected){$('error').textContent=`${error.message}。会话仍保持连接，已采集的数据未丢失。`;return;}
     $('error').textContent=`${error.message}。会话已停止；请检查后重新连接。`;
     if(state)paint({...state,connected:false,preview:null,joints:state.joints.map(j=>({...j,telemetry:null}))});
   }finally{busy=false;controls();i18n.apply();}

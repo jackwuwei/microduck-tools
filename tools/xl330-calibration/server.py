@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 import threading
 from urllib.parse import urlsplit
-from calibration import Session, SerialBus, DemoBus, IDS
+from calibration import Session, SerialBus, DemoBus, IDS, Rejected
 from ssh_bus import SshBus
 
 FOLDER = Path(__file__).resolve().parent
@@ -21,6 +21,8 @@ def handler(session, port):
              '/i18n.js':(FOLDER/'i18n.js','text/javascript; charset=utf-8'),
              '/duck-view.js':(FOLDER/'duck-view.js','text/javascript; charset=utf-8'),
              '/duck.bin':(MODEL,'application/octet-stream')}
+    missing = [str(file) for file,_ in files.values() if not file.is_file()]
+    if missing: raise FileNotFoundError('工作台文件缺失：'+'，'.join(missing))
     hosts = {f'127.0.0.1:{port}',f'localhost:{port}'}
     class Handler(BaseHTTPRequestHandler):
         def reply(self,status,data,mime='application/json; charset=utf-8'):
@@ -39,7 +41,8 @@ def handler(session, port):
             path = urlsplit(self.path).path
             if path in files:
                 file,mime = files[path]
-                return self.reply(200,file.read_bytes(),mime)
+                try: return self.reply(200,file.read_bytes(),mime)
+                except OSError: return self.reply(500,{'error':f'工作台文件缺失：{file.name}；请重启工作台'})
             with lock:
                 try:
                     if path == '/api/state': return self.reply(200,session.state())
@@ -59,15 +62,16 @@ def handler(session, port):
             with lock:
                 try:
                     length = int(self.headers.get('Content-Length','0'))
-                    if not 0 < length <= 2048: raise ValueError('请求大小无效')
-                    data = json.loads(self.rfile.read(length))
-                    if not isinstance(data,dict): raise ValueError('请求格式无效')
+                    if not 0 < length <= 2048: raise Rejected('请求大小无效')
+                    try: data = json.loads(self.rfile.read(length))
+                    except ValueError: raise Rejected('请求格式无效') from None
+                    if not isinstance(data,dict): raise Rejected('请求格式无效')
                     action = urlsplit(self.path).path
                     if action == '/api/connect': session.connect()
                     elif action == '/api/disconnect': session.disconnect()
                     else:
                         motor = data.get('motor')
-                        if type(motor) is not int or motor not in IDS: raise ValueError('无效关节 ID')
+                        if type(motor) is not int or motor not in IDS: raise Rejected('无效关节 ID')
                         if action == '/api/capture': session.capture(motor,data.get('kind'))
                         elif action == '/api/direction': session.direction(motor,data.get('reverse'))
                         elif action == '/api/preview': session.prepare(motor)
@@ -76,10 +80,13 @@ def handler(session, port):
                         elif action == '/api/restore-file': session.restore_file(motor,data.get('file',''))
                         elif action == '/api/demo-position' and session.demo:
                             value = data.get('position')
-                            if type(value) is not int or not 0 <= value <= 4095: raise ValueError('无效模拟位置')
+                            if type(value) is not int or not 0 <= value <= 4095: raise Rejected('无效模拟位置')
                             session.bus.rows[motor]['position'] = value
-                        else: raise ValueError('未知操作')
+                        else: raise Rejected('未知操作')
                     return self.reply(200,session.state())
+                except Rejected as error:
+                    # Nothing was written; keep the session and its captures.
+                    return self.reply(409,{'error':str(error),'disconnected':False})
                 except Exception as error:
                     # A failed EEPROM operation may be partially committed. Close the
                     # session; reconnect creates a new backup before any further write.

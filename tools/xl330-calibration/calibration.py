@@ -16,23 +16,28 @@ REGISTERS = {'model':(0,2,False),'firmware':(6,1,False),'drive':(10,1,False),'mo
              'torque':(64,1,False),'error':(70,1,False),'position':(132,4,True),
              'voltage':(144,2,False),'temperature':(146,1,False)}
 CONFIG = ('drive','offset','minimum','maximum')
+
 WRITABLE = frozenset(CONFIG)
+
+
+class Rejected(ValueError):
+    """Request refused before any bus write; the session stays connected."""
 
 
 def plan(row, marks):
     """No modulo: an ambiguous wrap/multiple turn must be recaptured, never guessed."""
     if set(marks) != {'zero','minimum','maximum'}:
-        raise ValueError('先采集零位和两个限位')
+        raise Rejected('先采集零位和两个限位')
     absolute = marks['zero'] - row['offset']
     if not 0 <= absolute <= 4095:
-        raise ValueError('编码器处于跨圈坐标；请断开工具，正常断电重启舵机后重连并重新采集')
+        raise Rejected('编码器处于跨圈坐标；请断开工具，正常断电重启舵机后重连并重新采集')
     offset = row['offset'] + 2048 - marks['zero']
     if not -1024 <= offset <= 1024:
-        raise ValueError('零位需要的偏移超出 ±1024；请调整舵盘安装位置后重新采集')
+        raise Rejected('零位需要的偏移超出 ±1024；请调整舵盘安装位置后重新采集')
     delta = offset - row['offset']
     lo, hi = marks['minimum'] + delta, marks['maximum'] + delta
     if not 0 <= lo < 2048 < hi <= 4095:
-        raise ValueError('限位必须位于 0–4095 且包围零位；请按模型负向/正向重新采集，勿跨整圈')
+        raise Rejected('限位必须位于 0–4095 且包围零位；请按模型负向/正向重新采集，勿跨整圈')
     return {'drive':row['drive'], 'offset':offset, 'minimum':lo, 'maximum':hi}
 
 
@@ -142,7 +147,7 @@ class Session:
         return rows
 
     def connect(self):
-        if self.bus: raise ValueError('已经连接')
+        if self.bus: raise Rejected('已经连接')
         self.bus = self.factory()
         try:
             self.bus.open()
@@ -172,21 +177,21 @@ class Session:
         self.preview = None
 
     def capture(self,motor,kind):
-        if kind not in ('zero','minimum','maximum'): raise ValueError('未知采集类型')
+        if kind not in ('zero','minimum','maximum'): raise Rejected('未知采集类型')
         rows = self.checked()
         # Ten actual responses over ~0.5 s, rejecting a moving hand or a wrap.
         samples = []
         for _ in range(10):
             samples.append(self.bus.read(motor,'position'))
             if not self.demo: time.sleep(.05)
-        if max(samples)-min(samples) > 8: raise ValueError('关节尚未静止，请稳定后重试')
+        if max(samples)-min(samples) > 8: raise Rejected('关节尚未静止，请稳定后重试')
         self.checked()
         self.marks.setdefault(motor,{})[kind] = round(sum(samples)/len(samples))
         self.preview = None
         self.completed.discard(motor)
 
     def direction(self,motor,reverse):
-        if type(reverse) is not bool: raise ValueError('方向必须为布尔值')
+        if type(reverse) is not bool: raise Rejected('方向必须为布尔值')
         self.checked()
         drive = (self.expected[motor]['drive'] & ~1) | int(reverse)
         if drive != self.expected[motor]['drive']:
@@ -216,7 +221,7 @@ class Session:
         self.checked()
         preview = self.preview
         if not preview or preview['motor'] != motor or token != preview['token']:
-            raise ValueError('预览已过期，请重新预览')
+            raise Rejected('预览已过期，请重新预览')
         self.preview = None  # single-use, including failed writes
         self.write_config(motor,preview['after'])
         self.marks.pop(motor,None)
@@ -233,14 +238,18 @@ class Session:
     def restore_file(self,motor,path):
         # Only server-created backups under the configured directory are eligible.
         candidate = (self.backup_dir / path).resolve()
-        if candidate.parent != self.backup_dir.resolve(): raise ValueError('无效备份路径')
-        data = json.loads(candidate.read_text())
-        if data.get('version') != 1 or data.get('demo') is not self.demo: raise ValueError('备份版本或模式不匹配')
-        row = data['joints'][str(motor)]
-        if row['model'] != 1200 or row['mode'] != 3: raise ValueError('备份型号或模式不匹配')
-        values = {k:row[k] for k in CONFIG}
+        if candidate.parent != self.backup_dir.resolve(): raise Rejected('无效备份路径')
+        try:
+            data = json.loads(candidate.read_text())
+            if data.get('version') != 1 or data.get('demo') is not self.demo: raise Rejected('备份版本或模式不匹配')
+            row = data['joints'][str(motor)]
+            if row['model'] != 1200 or row['mode'] != 3: raise Rejected('备份型号或模式不匹配')
+            values = {k:row[k] for k in CONFIG}
+        except (OSError,ValueError,KeyError,TypeError,AttributeError) as error:
+            if isinstance(error,Rejected): raise
+            raise Rejected('备份文件无法读取或已损坏') from error
         if any(type(v) is not int for v in values.values()) or not (0 <= values['drive'] <= 13 and -1024 <= values['offset'] <= 1024 and 0 <= values['minimum'] < values['maximum'] <= 4095):
-            raise ValueError('备份寄存器值无效')
+            raise Rejected('备份寄存器值无效')
         self.checked()
         self.preview = None
         self.write_config(motor,values)

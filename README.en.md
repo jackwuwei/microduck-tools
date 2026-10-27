@@ -4,7 +4,7 @@
 
 Microduck calibration workbench and final V3 calibration tray. **The workbench always runs on your computer. It uses the Microduck controller’s servo port over SSH by default, or a USB serial adapter connected directly to your computer.**
 
-Software lives in `tools/`, models in `assets/models/`, printing files in `CAD/`, and controller adaptation patches in `patches/`. `work/` holds locally generated parameter backups and zero-position surveys.
+The calibration workbench, including its 3D renderer, lives in `tools/xl330-calibration/`, models in `assets/models/`, printing files in `CAD/`, and controller adaptation patches in `patches/`. `work/` holds locally generated parameter backups and zero-position surveys.
 
 ## Contents
 
@@ -42,7 +42,7 @@ Photo backgrounds were blurred with AI assistance to hide unrelated details. The
 
 English workbench screenshot (demo mode, 1440 × 1000 desktop browser viewport).
 
-The interaction takes inspiration from kissqy/Microduck-kissqy: individual joint selection, separate zero / positive / negative / HOME references, capture, preview and save. The DYNAMIXEL Protocol 2.0 backend was implemented independently; no source code, calibration data or UI assets were copied from that project. The existing 3D renderer and model are reused; see the [upstream model license statement](https://github.com/pollen-robotics/microduck_rl/blob/d424a0c899f6b33cbd3daeb279913134349c0b63/README.md#license).
+The interaction takes inspiration from kissqy/Microduck-kissqy: individual joint selection, separate zero / positive / negative / HOME references, capture, preview and save. The DYNAMIXEL Protocol 2.0 backend was implemented independently; no source code, calibration data or UI assets were copied from that project. The 3D renderer `tools/xl330-calibration/duck-view.js` keeps only what calibration preview needs and reuses the existing model; see the [upstream model license statement](https://github.com/pollen-robotics/microduck_rl/blob/d424a0c899f6b33cbd3daeb279913134349c0b63/README.md#license).
 
 Supports this project’s **15 XL330-M288-T servos (model 1200), position mode 3**. The only EEPROM writes are the Drive Mode direction bit, Homing Offset and Min/Max Position Limit. The workbench never sends Goal Position, enables torque, stops services automatically or modifies IMU calibration.
 
@@ -446,7 +446,7 @@ Both limits shift by the same offset delta. Position mode supports only ±1024 H
 
 Restore the selected joint from this connection’s original parameters or a historical backup. Model and ID cannot uniquely identify a physical servo: confirm the robot and joint yourself. **Keep the backup directory.** Communication/read-back errors disconnect the session; partial writes may already exist. Other joints are not written and success is not reported. Reconnect and choose the backup from before the failure, not a new backup of the partially changed state. Restore writes are verified individually; power loss cannot guarantee automatic rollback.
 
-The server binds only to loopback and requires same-origin writes. One lock serializes bus operations. Port exclusivity and startup silence checks cannot prevent another physical controller joining later; maintain a single bus owner. The shared 3D renderer is for preview only.
+The server binds only to loopback and requires same-origin writes. One lock serializes bus operations. Port exclusivity and startup silence checks cannot prevent another physical controller joining later; maintain a single bus owner. The 3D renderer is for preview only.
 
 References: [XL330 official control table](https://emanual.robotis.com/docs/en/dxl/x/xl330-m288/), [interaction reference project](https://github.com/kissqy/Microduck-kissqy).
 
@@ -508,7 +508,7 @@ Values come directly from CLI G-code headers: `model printing time`, `total esti
 | Content | Source and terms |
 | --- | --- |
 | Robot reference geometry, UI robot model and derived fixtures | Pollen Robotics [`microduck_rl`](https://github.com/pollen-robotics/microduck_rl/tree/d424a0c899f6b33cbd3daeb279913134349c0b63), commit `d424a0c899f6b33cbd3daeb279913134349c0b63`. The pinned README says CC BY-SA-NC for model files without a version number; no additional version or commercial permission is implied. See the [pinned upstream README](https://github.com/pollen-robotics/microduck_rl/blob/d424a0c899f6b33cbd3daeb279913134349c0b63/README.md#license) for the original license statement. Software Apache-2.0 does not cover mechanical models. |
-| XL330 workbench and shared 3D renderer | Original software under [Apache-2.0](LICENSE); see [workbench implementation and interaction reference](#workbench). |
+| XL330 workbench and 3D renderer | Original software under [Apache-2.0](LICENSE); see [workbench implementation and interaction reference](#workbench). |
 | Runtime adaptation patch | Based on the [pinned Pollen Robotics microduck commit](https://github.com/pollen-robotics/microduck/tree/942e58e3aa6dbb28e7037203fff11866122c7567), under Apache-2.0. Trims default to zero; supply your own measurements. |
 | Photos | User-provided robot and tray photos for this project’s documentation; code or model licenses do not automatically apply. |
 | 3D-printed calibration fixture | The V3 zero tray references Xingmao’s XGO Duck neutral-position tray (`R7_X2D04_PETG_slice_reference.gcode.3mf`, CC BY-NC-SA 4.0), borrowing only the supine positioning approach. This design and derived geometry retain attribution and noncommercial terms under CC BY-NC-SA 4.0, without expanding upstream permissions. See [printing instructions](#cad-printing). |
