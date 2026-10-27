@@ -1,5 +1,7 @@
 # microduck-tools
 
+**简体中文** | [English](README.en.md)
+
 Microduck 标定工作台与 V3 最终版标定托盘。**工作台始终运行在电脑上，默认通过 SSH 使用 Microduck 的舵机串口，也支持电脑 USB 串口直连。**
 
 工具、模型与打印文件分别位于 `tools/`、`assets/models/` 和 `CAD/`，控制程序适配补丁位于 `patches/`；`work/` 用于本机生成的参数备份与零位采样记录。
@@ -39,6 +41,16 @@ Microduck 标定工作台与 V3 最终版标定托盘。**工作台始终运行�
 参考 kissqy/Microduck-kissqy 的逐关节选择、独立零位 / 正负向 / HOME 参考、采集、预览、保存交互，重新实现 DYNAMIXEL Protocol 2.0 后端。未复制对方源码、标定数据或界面资产。复用既有 3D 渲染器及模型（许可见 [官方模型许可记录](LICENSES/官方模型许可依据/README.md)）。
 
 支持本项目的 **15 台 XL330-M288-T（型号 1200）及位置模式 3**。仅写入 EEPROM 的 Drive Mode 方向位、Homing Offset 和 Min/Max Position Limit，不发送 Goal Position、不启用扭矩、不自动停止服务。本工具不会改写 IMU 标定。
+
+工作台顶部可通过 **中文 / English** 切换语言；浏览器会记住选择，首次默认按浏览器语言选择。切换不影响连接、采样或所选关节。界面文案、关节名称、实时读数、操作提示及应用错误支持双语；外部系统及 SDK 返回的诊断细节保留原文。选择舵机时会高亮实际舵机本体，被外壳遮挡的部分以半透明蓝色透视显示。拖动旋转，双击复位。
+
+离线演示：
+
+```bash
+./start-calibration.sh --demo
+```
+
+打开 [本机工作台](http://127.0.0.1:18092/)，无需连接硬件。
 
 <a id="connection"></a>
 
@@ -469,6 +481,7 @@ scripts/dev-push.sh microduck
 
 ```bash
 python3 -m unittest discover -s tools/xl330-calibration -p 'test_*.py' -v
+node --test tools/xl330-calibration/test_i18n.cjs
 ```
 
 测试使用模拟寄存器，覆盖零位换算、方向、限位、异常和备份恢复，不代表实机验收。真机程序尚需在你的接线及固件组合上逐关节验证。

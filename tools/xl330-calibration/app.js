@@ -1,4 +1,5 @@
 'use strict';
+const i18n = window.MicroduckI18n;
 const $ = id => document.getElementById(id);
 const home = [0,-.0873,-.4579,-.0049,.4530,.3491,.3491,0,0,0,0,.0873,.4579,.0049,-.4530];
 // XL330 housing instances in duck-web-mouth-v2.bin (mesh 3). Motor housings
@@ -18,11 +19,12 @@ function pose(){
   if(reference==='positive'||reference==='negative')joints[index]=(reference==='positive'?1:-1)*Math.PI/18;
   if(reference==='measured')joints=state.joints.map(j=>j.telemetry?(j.telemetry.position-2048)*Math.PI/2048:0);
   view.setState(joints,[0,0,-1]);
-  if(modelError){$('reference-note').textContent=`3D 不可用：${modelError}；请先修复模型显示再核对实物。`;return;}
+  if(modelError){$('reference-note').textContent=`3D 不可用：${modelError}；请先修复模型显示再核对实物。`;i18n.apply();return;}
   $('reference-note').textContent=reference==='measured'
     ?(state.connected?'当前编码器：使用舵机已保存的零位与方向；尚未应用采集草稿。躯干按水平显示。':'当前编码器不可用；模型暂按零位示意。')
     :'模型参考：仅改变屏幕姿态，不控制实物；采集 0° 时请使用“零位 0°”。';
   document.querySelectorAll('[data-ref]').forEach(b=>b.classList.toggle('active',b.dataset.ref===reference));
+  i18n.apply();
 }
 function controls(){
   const connected=state?.connected===true;
@@ -90,7 +92,7 @@ async function action(path,extra={}){
   }catch(error){
     $('error').textContent=`${error.message}。会话已停止；请检查后重新连接。`;
     if(state)paint({...state,connected:false,preview:null,joints:state.joints.map(j=>({...j,telemetry:null}))});
-  }finally{busy=false;controls();}
+  }finally{busy=false;controls();i18n.apply();}
 }
 $('ready').onchange=controls;$('reviewed').onchange=controls;
 $('connect').onclick=()=>action('connect');$('disconnect').onclick=()=>action('disconnect');
@@ -111,8 +113,11 @@ async function poll(){
       }
     }
   }
+  i18n.apply();
   setTimeout(poll,1000);
 }
 view.load('/duck.bin').then(pose).catch(e=>{modelError=e.message;pose();});
-setInterval(()=>{if(state?.connected&&performance.now()-lastSeen>3000){$('status').textContent='反馈已过期';$('metrics').textContent='读数过期';$('apply').disabled=true;}},500);
+setInterval(()=>{if(state?.connected&&performance.now()-lastSeen>3000){$('status').textContent='反馈已过期';$('metrics').textContent='读数过期';$('apply').disabled=true;i18n.apply();}},500);
+$('language').onchange=event=>i18n.setLanguage(event.target.value);
+i18n.apply();
 poll();

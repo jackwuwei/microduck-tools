@@ -19,6 +19,7 @@ def handler(session, port):
     lock = threading.Lock()
     files = {'/':(FOLDER/'index.html','text/html; charset=utf-8'),
              '/app.js':(FOLDER/'app.js','text/javascript; charset=utf-8'),
+             '/i18n.js':(FOLDER/'i18n.js','text/javascript; charset=utf-8'),
              '/duck-view.js':(RENDERER,'text/javascript; charset=utf-8'),
              '/duck.bin':(MODEL,'application/octet-stream')}
     hosts = {f'127.0.0.1:{port}',f'localhost:{port}'}

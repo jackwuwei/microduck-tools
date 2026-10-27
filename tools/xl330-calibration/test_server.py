@@ -25,7 +25,7 @@ class HttpTests(unittest.TestCase):
         res=conn.getresponse();status=res.status;data=res.read();conn.close();return status,data
     def test_disconnected_start_assets_and_origin(self):
         self.assertFalse(json.loads(self.request('/api/state')[1])['connected'])
-        for path in ['/','/app.js','/duck-view.js','/duck.bin']:self.assertEqual(self.request(path)[0],200)
+        for path in ['/','/app.js','/i18n.js','/duck-view.js','/duck.bin']:self.assertEqual(self.request(path)[0],200)
         self.assertEqual(self.request('/api/connect',{},origin=False)[0],403)
         self.assertEqual(self.request('/api/state',host='evil.example')[0],403)
         self.assertFalse(self.session.bus)
