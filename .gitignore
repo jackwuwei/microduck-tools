@@ -1,0 +1,14 @@
+.DS_Store
+__pycache__/
+*.py[cod]
+.venv/
+work/xl330-calibration-backups/
+
+# CAD Viewer 生成的预览缓存
+.*.step.glb
+
+# 本机零位采样记录
+work/zero-surveys/
+
+# Bambu Studio CLI 根目录临时输出
+/result.json

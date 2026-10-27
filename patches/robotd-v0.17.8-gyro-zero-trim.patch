@@ -1,0 +1,134 @@
+diff --git a/duck-control/src/model.rs b/duck-control/src/model.rs
+--- a/duck-control/src/model.rs
++++ b/duck-control/src/model.rs
+@@ -149,6 +149,17 @@
+     }
+ }
+ 
++/// Per-robot zero trims, in encoder counts, indexed as [`JOINT_IDS`].
++///
++/// Replace the neutral defaults with this robot's measured zero minus 2048.
++/// Keep the startup homing offsets unchanged; reads subtract and goals add trims.
++pub const ZERO_TRIM_COUNTS: [i32; NUM_JOINTS] = [0; NUM_JOINTS];
++
++/// Convert an encoder-count trim to radians.
++pub fn zero_trim(joint: usize) -> f64 {
++    ZERO_TRIM_COUNTS[joint] as f64 * 2.0 * std::f64::consts::PI / 4096.0
++}
++
+ /// Index of a joint by name. Linear scan over 15 entries, used at startup and in tests.
+ pub fn joint_index(name: &str) -> Option<usize> {
+     JOINT_NAMES.iter().position(|n| *n == name)
+@@ -267,6 +278,17 @@
+         }
+     }
+ 
++    /// The published template must not move an uncalibrated robot's zero.
++    /// Replace this neutral-default assertion with measured per-ID expectations
++    /// when filling ZERO_TRIM_COUNTS for a particular robot.
++    #[test]
++    fn zero_trims_are_neutral_by_default() {
++        assert_eq!(ZERO_TRIM_COUNTS, [0; NUM_JOINTS]);
++        for joint in 0..NUM_JOINTS {
++            assert_eq!(zero_trim(joint), 0.0);
++        }
++    }
++
+     /// `MOUTH_INDEX` is used to skip a slot when mapping 14 policy actions onto 15 joints.
+     /// Pointing it at the wrong joint would shift every action after it by one.
+     #[test]
+diff --git a/duck-control/src/bus.rs b/duck-control/src/bus.rs
+--- a/duck-control/src/bus.rs
++++ b/duck-control/src/bus.rs
+@@ -27,7 +27,7 @@
+ use crate::io::{ImuStale, IoError, JointTargets, Result, RobotIo, Sensors, SlowSensors};
+ use crate::model::{
+     BAUD_RATE, EXPECTED_REGISTERS, FACTORY_BAUD_RATE, FACTORY_ID, IMU_DXL_ID, JOINT_IDS,
+-    JOINT_NAMES, NUM_JOINTS, homing_offset,
++    JOINT_NAMES, NUM_JOINTS, homing_offset, zero_trim,
+ };
+ 
+ /// Start of the contiguous block read every tick: `present_pwm`, `present_current`,
+@@ -404,7 +404,9 @@
+             });
+         }
+         let mut out = [0.0; NUM_JOINTS];
+-        out.copy_from_slice(&values);
++        for (joint, value) in values.iter().enumerate() {
++            out[joint] = value - zero_trim(joint);
++        }
+         Ok(out)
+     }
+ 
+@@ -565,15 +567,20 @@
+             let velocity = i32::from_le_bytes([block[4], block[5], block[6], block[7]]);
+             sensors.velocities[joint] = velocity as f64 * RAD_PER_SEC_PER_COUNT;
+             let position = i32::from_le_bytes([block[8], block[9], block[10], block[11]]);
+-            sensors.positions[joint] = (2.0 * PI * position as f64 / 4096.0) - PI;
++            sensors.positions[joint] =
++                (2.0 * PI * position as f64 / 4096.0) - PI - zero_trim(joint);
+         }
+ 
+         Ok(sensors)
+     }
+ 
+     fn write(&mut self, targets: &JointTargets) -> Result<()> {
++        let mut goals = targets.positions;
++        for (joint, goal) in goals.iter_mut().enumerate() {
++            *goal += zero_trim(joint);
++        }
+         self.controller
+-            .sync_write_goal_position(&JOINT_IDS, &targets.positions)
++            .sync_write_goal_position(&JOINT_IDS, &goals)
+             .map_err(|e| IoError::Bus(format!("sync_write goal positions: {e}")))
+     }
+ 
+diff --git a/duck-control/src/imu.rs b/duck-control/src/imu.rs
+--- a/duck-control/src/imu.rs
++++ b/duck-control/src/imu.rs
+@@ -9,7 +9,7 @@
+ //!
+ //! | bytes | contents |
+ //! |---|---|
+-//! | 0..6  | gyro x/y/z, `i16` LE raw counts, ±500 dps |
++//! | 0..6  | gyro x/y/z, `i16` LE, 16.4 counts per degree/second |
+ //! | 6..12 | SFLP quaternion x/y/z as IEEE half-precision; `w = √(1 − x² − y² − z²)` |
+ //!
+ //! The board's full diagnostic block is 20 bytes (it also carries raw accelerometer, a
+@@ -44,8 +44,10 @@
+     }
+ }
+ 
+-/// ±500 dps at 17.5 mdps/LSB, in rad/s.
+-const GYRO_RAD_PER_LSB: f64 = 0.0175 * std::f64::consts::PI / 180.0;
++/// This board uses the MicroDuck IMU bus protocol v1.2 (2026-09-28), page 5:
++/// gyro degrees/second = signed count / 16.4. Using the ST chip's raw sensitivity
++/// here under-reports this board's transmitted rate by 3.484 times.
++const GYRO_RAD_PER_LSB: f64 = std::f64::consts::PI / (180.0 * 16.4);
+ 
+ /// Decodes the board's block into [`ImuData`].
+ ///
+@@ -338,6 +340,23 @@
+         assert!(mag <= 1.0 + 1e-9);
+     }
+ 
++    /// Pin the board protocol's physical units independently of the decoder constant.
++    /// This prevents a chip sensitivity from silently replacing the bus scale again.
++    #[test]
++    fn protocol_v1_2_gyro_counts_decode_to_radians_per_second() {
++        let mut d = SflpDecoder::new([1.0, 0.0, 0.0, 0.0]);
++        let mut block = [0u8; IMU_BLOCK_LEN];
++        for (axis, count) in [1640i16, -820, 328].iter().enumerate() {
++            block[2 * axis..2 * axis + 2].copy_from_slice(&count.to_le_bytes());
++        }
++        d.decode(&block);
++        d.decode(&block);
++        let out = d.decode(&block);
++        for (actual, degrees_per_second) in out.gyro.iter().zip([100.0_f64, -50.0, 20.0]) {
++            assert!((actual - degrees_per_second.to_radians()).abs() < 1e-9);
++        }
++    }
++
+     /// Gyro counts are signed. Reading them as unsigned would turn every negative rate
+     /// into a large positive one, which reads as a robot spinning.
+     #[test]
