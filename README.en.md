@@ -7,6 +7,7 @@ A zero-calibration workbench for Microduck's XL330 servos, plus the matching V3 
 | Folder | Contents |
 | --- | --- |
 | `tools/xl330-calibration/` | Workbench: web page, backend, 3D renderer, tests |
+| `tools/imu-calibration/` | Body IMU mount calibration: command-line capture, solve, tests |
 | `assets/` | 3D model, photos, screenshots |
 | `CAD/` | V3 tray STEP / STL |
 | `patches/` | robotd software zero-trim patch |
@@ -18,6 +19,7 @@ A zero-calibration workbench for Microduck's XL330 servos, plus the matching V3 
 - [Install and connect](#connection)
 - [Calibration procedure](#calibration-flow)
 - [Apply to robotd](#apply-calibration)
+- [IMU mount calibration](#imu-calibration)
 - [Appendix: EEPROM writes](#eeprom)
 - [Power and tests](#offline-tests)
 - [Tray printing](#cad-printing)
@@ -255,6 +257,47 @@ After filling in the trims, run `cargo test -p duck-control`, then build and ins
 
 To roll back, restore the previous array, rebuild and reinstall.
 
+<a id="imu-calibration"></a>
+
+## IMU mount calibration
+
+Measures how far the body IMU (the `imu_to_dxl` board, bus ID 200) is mounted off the trunk, in pitch and roll. In training, "trunk level" means the IMU reads zero; a module a few degrees off makes the policy keep correcting the other way and lunge as soon as it takes over. The method follows [microduck-replica's IMU calibration notes](https://github.com/fanhao375/microduck-replica/blob/main/docs/HD1910-20261012-夜-IMU校准与首次迈步.md), reworked so the servos stay limp:
+
+- Hold the trunk with **both soles flat on a level table**, in any pose. The joint angles go through the MJCF kinematics to give the gravity the trunk should see; a least-squares fit against what the IMU reports gives the correction.
+- Turn the duck 180° on the spot and capture again: a table that is not level cancels out.
+- Read-only: servo positions and the IMU block. No register writes, no torque, no goals.
+
+**Before you start:** finish and deploy the joint zero calibration above; the kinematics depend on the joint angles. Connection and SSH dependencies are the same as the workbench.
+
+### 1. Capture
+
+1. Sit the robot down or lay it flat, then stop robotd on the controller (stopping it removes torque): `sudo systemctl stop robotd`.
+2. Start on the computer. Point `--zero-trim` at the `ZERO_TRIM_COUNTS` robotd **currently runs** (`model.rs` or a workbench `*-trims.txt`):
+
+   ```bash
+   ./start-imu-calibration.sh --zero-trim ../microduck-fanduck-0.17.8/duck-control/src/model.rs
+   ```
+
+   Add `--serial <port>` for a USB adapter. If robotd does not use the zero3 default mount, add `--mount beta` or `--mount w,x,y,z`.
+3. Change pose each time (crouched, tall, trunk tilted a little forward, back, sideways), soles always flat, hold still and press **Enter**. Take 3–5 at heading 0°.
+4. Type `t`, turn the duck 180° on the table, and take another 3–5.
+5. `s` shows the result, `u` undoes the last capture, `q` saves and quits. Surveys go to `work/imu-surveys/`; `python3 tools/imu-calibration/imu_calibration.py solve <survey>.json` recomputes one.
+
+| Rejection | What to do |
+| --- | --- |
+| Servo torque on | robotd is still running, or something else enabled torque |
+| Joints moving / IMU wobbling | Hold still and retry |
+| The two feet disagree by more than 3° | Both soles are not flat at once, or the joint zeros are off |
+| Empty SFLP quaternion | The IMU just powered up; wait and retry |
+
+**Reading the result:** the two headings' separate solves should be close; half their difference is the table's tilt. Mean residual after correction should be within about 0.5°. A correction of a few degrees is typical.
+
+### 2. Apply and recheck
+
+The tool ends by printing a `MEASURED_MOUNT` constant that already includes the existing mount (`M′ = C ⊗ M`). Put it in robotd's `duck-control/src/imu.rs` and have `body_imu_mount` in `robotd/src/main.rs` return it for zero3; pin it with a test, then build and deploy as in [Apply to robotd](#apply-calibration).
+
+After deploying, recheck with `--mount w,x,y,z` set to the new quaternion: the correction should come out near 0. Recheck after a hard fall, after knocking the IMU or re-soldering its wires, and recalibrate if it is more than 1°–2° off.
+
 <a id="eeprom"></a>
 
 ## Appendix: EEPROM writes (optional)
@@ -280,6 +323,7 @@ new Homing Offset = old Homing Offset + 2048 − zero sample
 
 ```bash
 python3 -m unittest discover -s tools/xl330-calibration -p 'test_*.py' -v
+python3 -m unittest discover -s tools/imu-calibration -p 'test_*.py' -v
 node --test tools/xl330-calibration/test_i18n.cjs
 ```
 
@@ -316,6 +360,7 @@ Have on hand: 55 g for the lower half only, 140 g for the full set.
 | Content | Source and terms |
 | --- | --- |
 | Robot reference geometry, UI robot model and derived fixtures | Pollen Robotics [`microduck_rl`](https://github.com/pollen-robotics/microduck_rl/tree/d424a0c899f6b33cbd3daeb279913134349c0b63), commit `d424a0c899f6b33cbd3daeb279913134349c0b63`. The pinned README says CC BY-SA-NC for model files without a version number; no additional version or commercial permission is implied. See the [pinned upstream README](https://github.com/pollen-robotics/microduck_rl/blob/d424a0c899f6b33cbd3daeb279913134349c0b63/README.md#license). Software Apache-2.0 does not cover mechanical models. |
+| IMU calibration kinematic model `assets/models/robot_walk.xml` | `kinematics/assets/alpha/robot_walk.xml` from the Pollen Robotics [`microduck` pinned commit](https://github.com/pollen-robotics/microduck/tree/942e58e3aa6dbb28e7037203fff11866122c7567), copied unchanged. It is taken from the `mjlab_microduck` training scene and is robot geometry, under the model license in the row above. |
 | XL330 workbench and 3D renderer | Original code under [Apache-2.0](LICENSE). The interaction takes inspiration from [kissqy/Microduck-kissqy](https://github.com/kissqy/Microduck-kissqy); the DYNAMIXEL Protocol 2.0 backend is an independent implementation, and no source code, calibration data or UI assets were copied. Registers follow the [official XL330 control table](https://emanual.robotis.com/docs/en/dxl/x/xl330-m288/). |
 | Controller adaptation patch | Based on the pinned Pollen Robotics [`microduck` commit](https://github.com/pollen-robotics/microduck/tree/942e58e3aa6dbb28e7037203fff11866122c7567), provided under Apache-2.0. The patch defaults to zero trims; fill in your own measurements. |
 | Photos | Robot and tray photos supplied by the user for this project's documentation; code and model licenses do not apply to them automatically. |

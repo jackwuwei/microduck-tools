@@ -7,6 +7,7 @@ Microduck 的 XL330 舵机零位标定工作台和配套的 V3 标定托盘。�
 | 目录 | 内容 |
 | --- | --- |
 | `tools/xl330-calibration/` | 标定工作台：网页、后端、3D 渲染器、测试 |
+| `tools/imu-calibration/` | 机身 IMU 安装标定：命令行采集、解算、测试 |
 | `assets/` | 3D 模型、照片、截图 |
 | `CAD/` | V3 托盘 STEP / STL |
 | `patches/` | robotd 软件零位补偿补丁 |
@@ -18,6 +19,7 @@ Microduck 的 XL330 舵机零位标定工作台和配套的 V3 标定托盘。�
 - [安装与连接](#connection)
 - [标定流程](#calibration-flow)
 - [应用到 robotd](#apply-calibration)
+- [IMU 安装标定](#imu-calibration)
 - [附：EEPROM 写入](#eeprom)
 - [供电与测试](#offline-tests)
 - [托盘打印](#cad-printing)
@@ -255,6 +257,47 @@ git apply "$TOOLS_ROOT/patches/robotd-v0.17.8-gyro-zero-trim.patch"
 
 回退时恢复上一组数组，重新构建并安装。
 
+<a id="imu-calibration"></a>
+
+## IMU 安装标定
+
+标定机身 IMU（`imu_to_dxl` 板，总线 ID 200）相对机身的安装偏差（俯仰、横滚）。策略训练时“机身水平”就等于 IMU 读数为零；模块装歪几度，模型会一直往反方向救，一接管就往后猛冲。方法参考 [microduck-replica 的 IMU 校准记录](https://github.com/fanhao375/microduck-replica/blob/main/docs/HD1910-20261012-夜-IMU校准与首次迈步.md)，改为舵机松力即可完成：
+
+- 双手扶住机身，**两只脚掌同时平贴水平桌面**，姿势随意。关节角经 MJCF 运动学算出机身“应有”的重力方向，和 IMU 实际读数比较，最小二乘解出修正。
+- 把鸭子在桌上原地掉头 180° 再采一组，桌面不平的影响会相互抵消。
+- 只读总线：读舵机位置和 IMU 数据块，不写寄存器、不开扭矩、不发目标。
+
+**前提：** 先完成上面的关节零位标定并部署到 robotd，运动学依赖准确的关节角。连接方式和 SSH 依赖同标定工作台。
+
+### 1. 采集
+
+1. 让机器人坐下或放平，在主控停止 robotd（停止时会卸力）：`sudo systemctl stop robotd`。
+2. 在电脑启动，`--zero-trim` 指向 robotd **当前部署**的 `ZERO_TRIM_COUNTS`（`model.rs` 或工作台的 `*-trims.txt`）：
+
+   ```bash
+   ./start-imu-calibration.sh --zero-trim ../microduck-fanduck-0.17.8/duck-control/src/model.rs
+   ```
+
+   USB 直连时加 `--serial 电脑串口路径`。robotd 用的不是 zero3 默认安装时加 `--mount beta` 或 `--mount w,x,y,z`。
+3. 每次换一个姿势（蹲低、站高、机身前后左右倾一点），两只脚掌始终平贴，扶稳后按 **回车** 采集。朝向 0° 采 3–5 个。
+4. 输入 `t`，把鸭子在桌上原地转 180°，再采 3–5 个。
+5. `s` 查看结果，`u` 撤销上一个，`q` 保存退出。记录保存在 `work/imu-surveys/`，可用 `python3 tools/imu-calibration/imu_calibration.py solve 记录.json` 重新解算。
+
+| 未采集提示 | 处理 |
+| --- | --- |
+| 舵机扭矩开启 | robotd 没停干净，或有其他程序开了扭矩 |
+| 关节尚未静止 / IMU 读数在晃 | 扶稳后重试 |
+| 两只脚算出的机身姿态相差超过 3° | 两只脚掌没有同时平贴，或关节零位不准 |
+| SFLP 四元数为空 | IMU 刚上电，稍等再试 |
+
+**判读：** 两个朝向各自解出的修正应相近，相差的一半就是桌面倾斜；修正后残差平均应在 0.5° 左右以内。修正量通常是几度。
+
+### 2. 应用与复查
+
+工具最后打印一行 `MEASURED_MOUNT` 常量，它已经包含原安装旋转（`M′ = C ⊗ M`）。放进 robotd 的 `duck-control/src/imu.rs`，并让 `robotd/src/main.rs` 的 `body_imu_mount` 在 zero3 分支返回它；加测试钉住数值，构建部署同 [应用到 robotd](#apply-calibration)。
+
+部署后用新值复查一次：`--mount w,x,y,z` 填刚部署的四元数，修正应接近 0。摔得狠、碰过 IMU 或重焊过线以后再查，偏差超过 1°–2° 就重新标定。
+
 <a id="eeprom"></a>
 
 ## 附：EEPROM 写入（可选）
@@ -280,6 +323,7 @@ git apply "$TOOLS_ROOT/patches/robotd-v0.17.8-gyro-zero-trim.patch"
 
 ```bash
 python3 -m unittest discover -s tools/xl330-calibration -p 'test_*.py' -v
+python3 -m unittest discover -s tools/imu-calibration -p 'test_*.py' -v
 node --test tools/xl330-calibration/test_i18n.cjs
 ```
 
@@ -316,6 +360,7 @@ node --test tools/xl330-calibration/test_i18n.cjs
 | 内容 | 来源与适用说明 |
 | --- | --- |
 | 机器人参考几何、界面机器人模型及衍生夹具 | Pollen Robotics [`microduck_rl`](https://github.com/pollen-robotics/microduck_rl/tree/d424a0c899f6b33cbd3daeb279913134349c0b63)，提交 `d424a0c899f6b33cbd3daeb279913134349c0b63`。锁定版 README 标明模型为 CC BY-SA-NC，未写明版本号；不自行追加版本或商业授权。见[固定版本的上游 README](https://github.com/pollen-robotics/microduck_rl/blob/d424a0c899f6b33cbd3daeb279913134349c0b63/README.md#license)。软件的 Apache-2.0 条款不覆盖机械模型。 |
+| IMU 标定运动学模型 `assets/models/robot_walk.xml` | Pollen Robotics [`microduck` 固定提交](https://github.com/pollen-robotics/microduck/tree/942e58e3aa6dbb28e7037203fff11866122c7567) 的 `kinematics/assets/alpha/robot_walk.xml`，原样复制；它取自训练所用的 `mjlab_microduck` 场景，属于机器人几何，按上一行模型许可处理。 |
 | XL330 标定工作台及 3D 渲染器 | 自有代码，采用 [Apache-2.0](LICENSE)。交互参考 [kissqy/Microduck-kissqy](https://github.com/kissqy/Microduck-kissqy)，DYNAMIXEL Protocol 2.0 后端为独立实现，未复制对方源码、标定数据或界面资产。寄存器依据 [XL330 官方控制表](https://emanual.robotis.com/docs/en/dxl/x/xl330-m288/)。 |
 | 控制程序适配补丁 | 基于 Pollen Robotics [`microduck` 固定提交](https://github.com/pollen-robotics/microduck/tree/942e58e3aa6dbb28e7037203fff11866122c7567)，按 Apache-2.0 提供。补丁默认零补偿，需填写各自实测值。 |
 | 实拍照片 | 用户提供的机器人与标定托盘照片，用于本项目说明；不自动套用代码或机械模型许可。 |

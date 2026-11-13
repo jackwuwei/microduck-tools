@@ -7,8 +7,19 @@ work/xl330-calibration-backups/
 # CAD Viewer 生成的预览缓存
 .*.step.glb
 
-# 本机零位采样记录
+# 本机零位与 IMU 采样记录
 work/zero-surveys/
+work/imu-surveys/
 
 # Bambu Studio CLI 根目录临时输出
 /result.json
+
+# DuckBuddy App 生成物（由 app/core/scripts/build-*.sh 生成）
+app/core/target/
+app/ios/DuckCore/
+app/android/app/src/main/jniLibs/
+app/android/app/src/main/java/uniffi/
+app/android/.gradle/
+app/android/build/
+app/android/app/build/
+app/android/local.properties
