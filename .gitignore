@@ -18,12 +18,5 @@ work/sim-real-*/*.jsonl
 # Bambu Studio CLI 根目录临时输出
 /result.json
 
-# DuckBuddy App 生成物（由 app/core/scripts/build-*.sh 生成）
-app/core/target/
-app/ios/DuckCore/
-app/android/app/src/main/jniLibs/
-app/android/app/src/main/java/uniffi/
-app/android/.gradle/
-app/android/build/
-app/android/app/build/
-app/android/local.properties
+# DuckBuddy 已迁移到独立仓库，本地副本不再提交
+/app/
