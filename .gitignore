@@ -11,6 +11,10 @@ work/xl330-calibration-backups/
 work/zero-surveys/
 work/imu-surveys/
 
+# 本机真机标定备份与仿真运行日志
+work/zero-trim-backups/
+work/sim-real-*/*.jsonl
+
 # Bambu Studio CLI 根目录临时输出
 /result.json
 
